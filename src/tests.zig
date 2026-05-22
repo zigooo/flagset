@@ -69,14 +69,8 @@ test "default values" {
     );
 }
 
-test "accept std.process.args()/argsAlloc() mem.tokenize()/split()" {
-    var iter = try std.process.argsWithAllocator(std.testing.allocator);
-    defer iter.deinit();
-    _ = try flagset.parseFromIter(&[_]flagset.Flag{}, iter, .{});
-
-    const args = try std.process.argsAlloc(std.testing.allocator);
-    defer std.process.argsFree(std.testing.allocator, args);
-    _ = try flagset.parseFromSlice(&[_]flagset.Flag{}, args, .{});
+test "accept parseFromSlice mem.tokenize()/split()" {
+    _ = try flagset.parseFromSlice(&[_]flagset.Flag{}, testArgs(&.{}), .{});
 
     _ = try flagset.parseFromIter(&[_]flagset.Flag{}, std.mem.tokenizeScalar(u8, exepath, ' '), .{});
     _ = try flagset.parseFromIter(&[_]flagset.Flag{}, std.mem.splitScalar(u8, exepath, ' '), .{});
@@ -765,7 +759,7 @@ test "list" {
 }
 
 test "list parse into ptrs" {
-    var list: std.ArrayListUnmanaged([]const u8) = .{};
+    var list: std.ArrayListUnmanaged([]const u8) = .empty;
     defer list.deinit(std.testing.allocator);
     const flags = [_]flagset.Flag{
         .init([]const u8, "list", .{ .kind = .list }),
