@@ -2,7 +2,7 @@ const std = @import("std");
 
 const flagset = @import("flagset");
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     const flags = [_]flagset.Flag{
         .init(bool, "flag", .{ .short = 'f', .desc = "flag description" }),
         .init(u32, "count", .{ .desc = "count description" }),
@@ -15,11 +15,10 @@ pub fn main() !void {
         .init([]const u8, "list", .{ .desc = "list description", .kind = .list, .short = 'l' }),
     };
 
-    const alloc = std.heap.page_allocator; // TODO use a better allocator
-    var args = try std.process.argsWithAllocator(alloc);
-    defer args.deinit();
+    const alloc = init.arena.allocator();
+    const args = try init.minimal.args.toSlice(alloc);
 
-    var result = flagset.parseFromIter(&flags, args, .{ .allocator = alloc }) catch |e| switch (e) {
+    const result = flagset.parseFromSlice(&flags, args, .{ .allocator = alloc }) catch |e| switch (e) {
         error.HelpRequested => {
             std.debug.print("{f}", .{flagset.fmtUsage(&flags, ": <45", .full,
                 \\
@@ -33,6 +32,6 @@ pub fn main() !void {
     };
     std.debug.print("parsed: {f}\n", .{flagset.fmtParsed(&flags, result.parsed, .{})});
     std.debug.print("unparsed args: ", .{});
-    while (result.unparsed_args.next()) |arg| std.debug.print("{s} ", .{arg});
+    for (result.unparsed_args) |arg| std.debug.print("{s} ", .{arg});
     std.debug.print("\n", .{});
 }

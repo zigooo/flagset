@@ -50,7 +50,7 @@ fn drain(io_w: *Writer, data: []const []const u8, splat: usize) Writer.Error!usi
     return count;
 }
 
-fn sendFile(io_w: *Writer, file_reader: *std.fs.File.Reader, limit: std.Io.Limit) Writer.FileError!usize {
+fn sendFile(io_w: *Writer, file_reader: *std.Io.File.Reader, limit: std.Io.Limit) Writer.FileError!usize {
     const w: *Counting = @alignCast(@fieldParentPtr("writer", io_w));
     stealBuffer(w.child, &w.writer);
     defer stealBuffer(&w.writer, w.child);

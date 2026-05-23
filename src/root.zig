@@ -167,10 +167,10 @@ pub inline fn checkParseFn(comptime T: type, comptime parseFn: anytype) *const a
     }
 }
 
-fn validateFlag(flag: Flag, i: usize, fields: []const std.builtin.Type.StructField) void {
+fn validateFlag(flag: Flag, i: usize, field_names: []const []const u8) void {
     // check for duplicate names
-    for (fields, 0..) |f, j| {
-        if (mem.eql(u8, flag.name, f.name)) duplicateNameError(flag, i, j);
+    for (field_names, 0..) |name, j| {
+        if (mem.eql(u8, flag.name, name)) duplicateNameError(flag, i, j);
     }
 
     if (mem.indexOfScalar(u8, flag.name, ' ') != null)
@@ -186,28 +186,19 @@ fn validateFlag(flag: Flag, i: usize, fields: []const std.builtin.Type.StructFie
 /// a struct with field names and types from 'flags'
 pub inline fn Parsed(comptime flags: []const Flag) type {
     comptime {
-        const StructField = std.builtin.Type.StructField;
-        var fields: []const StructField = &.{};
+        var field_names: [flags.len][]const u8 = undefined;
+        var field_types: [flags.len]type = undefined;
+        var field_attrs: [flags.len]std.builtin.Type.StructField.Attributes = @splat(.{});
         for (flags, 0..) |flag, i| {
-            validateFlag(flag, i, fields);
+            validateFlag(flag, i, field_names[0..i]);
             const T = if (flag.options.kind == .list)
                 std.ArrayListUnmanaged(flag.type)
             else
                 flag.type;
-            fields = fields ++ .{StructField{
-                .type = T,
-                .name = flag.name,
-                .default_value_ptr = null,
-                .is_comptime = false,
-                .alignment = @alignOf(T),
-            }};
+            field_names[i] = flag.name;
+            field_types[i] = T;
         }
-        return @Type(.{ .@"struct" = .{
-            .layout = .auto,
-            .decls = &.{},
-            .is_tuple = false,
-            .fields = fields,
-        } });
+        return @Struct(.auto, null, &field_names, &field_types, &field_attrs);
     }
 }
 
@@ -217,10 +208,11 @@ pub fn ParsedPtrs(
     comptime mutability: enum { @"const", mut },
 ) type {
     comptime {
-        const StructField = std.builtin.Type.StructField;
-        var fields: []const StructField = &.{};
+        var field_names: [flags.len][]const u8 = undefined;
+        var field_types: [flags.len]type = undefined;
+        var field_attrs: [flags.len]std.builtin.Type.StructField.Attributes = @splat(.{});
         for (flags, 0..) |flag, i| {
-            validateFlag(flag, i, fields);
+            validateFlag(flag, i, field_names[0..i]);
             const T = ?if (flag.options.kind == .list)
                 *std.ArrayListUnmanaged(flag.type)
             else if (mutability == .@"const")
@@ -228,20 +220,11 @@ pub fn ParsedPtrs(
             else
                 *flag.type;
             const default: T = null;
-            fields = fields ++ .{StructField{
-                .type = T,
-                .name = flag.name,
-                .default_value_ptr = @ptrCast(&default),
-                .is_comptime = false,
-                .alignment = @alignOf(T),
-            }};
+            field_names[i] = flag.name;
+            field_types[i] = T;
+            field_attrs[i] = .{ .default_value_ptr = @ptrCast(&default) };
         }
-        return @Type(.{ .@"struct" = .{
-            .layout = .auto,
-            .decls = &.{},
-            .is_tuple = false,
-            .fields = fields,
-        } });
+        return @Struct(.auto, null, &field_names, &field_types, &field_attrs);
     }
 }
 
@@ -332,7 +315,7 @@ pub fn parseFromIter(
     var seen_flags = std.enums.EnumSet(FieldEnum).initEmpty();
     inline for (flags, 0..) |flag, i| {
         if (flag.options.kind == .list) {
-            @field(parsed, flag.name) = .{};
+            @field(parsed, flag.name) = .empty;
             seen_flags.insert(@enumFromInt(i));
         }
     }
